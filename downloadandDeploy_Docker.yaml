@@ -1,0 +1,41 @@
+---
+- name: This play is to download the latest war file from nexus,create Dockerfile,Build Image and run Docker Container
+  hosts: docker
+  become: true
+  vars_files:
+   - /opt/playbooks/variables.yaml
+
+  tasks:
+     - name: download the war file
+       shell: 'curl -u admin:admin -L "http://17.98.26.0:8081/service/rest/v1/search/assets/download?sort=version&repository=ShiroLab-RELEASE&maven.groupId=com.shirolab&maven.artifactId=ShiroLab&maven.extension=war" -H "accept: application/json" --output /home/ansibleadmin/latest.war'
+       args:
+          chdir: "{{ changedir_location }}"
+   
+     - name: create Dockerfile with content
+       copy:
+         dest: /home/ansibleadmin/Dockerfile
+         content: |
+                FROM tomcat:latest
+                LABEL Author = "shiro"
+                ADD ./latest.war /usr/local/tomcat/webapps
+                RUN chmod +x $CATALINA_HOME/bin
+                EXPOSE 8080
+                CMD ["catalina.sh","run"]
+
+     - name: build an image
+       docker_image:
+           name: devopslab-image
+           path : /home/ansibleadmin
+           force: yes
+           state: present
+
+     - name: run the container
+       docker_container:
+           name: devopslab-container
+           image: devopslab-image:latest
+           state: started
+           recreate: yes
+           published_ports:
+                   - 0.0.0.0:8080:8080
+
+...
